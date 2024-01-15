@@ -88,19 +88,9 @@ func (d downstreamTLS) Parse(annotations Annotations, config *Ingress, _ *Global
 		if namespacedName.Name == "" {
 			IngressLog.Errorf("Default CA secret name %s format is invalid.", secretName)
 		} else {
-			if namespacedName.Namespace == "" {
-				namespacedName.Namespace = "default"
-				if existingSecret, err := getSecretInDefaultNamespace(namespacedName.Name); err == nil {
-					if !secretContentsEqual(existingSecret, desiredSecretContent) {
-						IngressLog.Errorf("Secret %s in default namespace already exists with different content.", namespacedName.Name)
-					} else {
-						IngressLog.Warnf("Secret %s already exists in default namespace with the same content.", namespacedName.Name)
-					}
-				}
-			} else {
-				downstreamTLSConfig.CASecretName = namespacedName
-				downstreamTLSConfig.Mode = networking.ServerTLSSettings_MUTUAL
-			}
+			namespacedName.Namespace = "default"
+			downstreamTLSConfig.CASecretName = namespacedName
+			downstreamTLSConfig.Mode = networking.ServerTLSSettings_MUTUAL
 		}
 	}
 

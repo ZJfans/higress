@@ -30,6 +30,7 @@ import (
 const (
 	authTLSSecret = "auth-tls-secret"
 	sslCipher     = "ssl-cipher"
+	defaultAuthTLSSecret = "default-auth-tls-secret"
 )
 
 var (
@@ -82,6 +83,27 @@ func (d downstreamTLS) Parse(annotations Annotations, config *Ingress, _ *Global
 		downstreamTLSConfig.CipherSuites = validCipherSuite
 	}
 
+	if secretName, err := annotations.ParseStringASAP(defaultAuthTLSSecret); err == nil {
+		namespacedName := util.SplitNamespacedName(secretName)
+		if namespacedName.Name == "" {
+			IngressLog.Errorf("Default CA secret name %s format is invalid.", secretName)
+		} else {
+			if namespacedName.Namespace == "" {
+				namespacedName.Namespace = "default"
+				if existingSecret, err := getSecretInDefaultNamespace(namespacedName.Name); err == nil {
+					if !secretContentsEqual(existingSecret, desiredSecretContent) {
+						IngressLog.Errorf("Secret %s in default namespace already exists with different content.", namespacedName.Name)
+					} else {
+						IngressLog.Warnf("Secret %s already exists in default namespace with the same content.", namespacedName.Name)
+					}
+				}
+			} else {
+				downstreamTLSConfig.CASecretName = namespacedName
+				downstreamTLSConfig.Mode = networking.ServerTLSSettings_MUTUAL
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -113,5 +135,6 @@ func (d downstreamTLS) ApplyGateway(gateway *networking.Gateway, config *Ingress
 
 func needDownstreamTLS(annotations Annotations) bool {
 	return annotations.HasASAP(sslCipher) ||
-		annotations.HasASAP(authTLSSecret)
+		annotations.HasASAP(authTLSSecret) ||
+		annotations.HasASAP(defaultAuthTLSSecret)
 }

@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev_default_certificate
+
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ''
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+
+jobs:
+  build-controller-image:
+    runs-on: ubuntu-latest
+    environment:
+      name: image-registry-controller
+    env:
+      CONTROLLER_IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY || 'higress-registry.cn-hangzhou.cr.aliyuncs.com' }}
+      CONTROLLER_IMAGE_NAME: ${{ vars.CONTROLLER_IMAGE_NAME || 'higress/higress' }}
+    steps:
+      - name: "Checkout ${{ github.ref }}"
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: "Setup Go"
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Setup Golang Caches
+        uses: actions/cache@v3
+        with:
+          path: |-
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-go
+
+      - name: Setup Submodule Caches
+        uses: actions/cache@v3
+        with:
+          path: |-
+            envoy
+            istio
+            .git/modules
+          key: ${{ runner.os }}-submodules-new-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-submodules-new
+
+      - name: Calculate Docker metadata
+        id: docker-meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.CONTROLLER_IMAGE_REGISTRY }}/${{ env.CONTROLLER_IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image and Push
+        run: |
+          GOPROXY="https://proxy.golang.org,direct" make docker-buildx-push
+          BUILT_IMAGE="zjfans/higress_controller:1.1.1"
+          readarray -t IMAGES <<< "${{ steps.docker-meta.outputs.tags }}"
+          for image in ${IMAGES[@]}; do
+            echo "Image: $image"
+            docker buildx imagetools create $BUILT_IMAGE:$GITHUB_SHA --tag $image
+          done
+        

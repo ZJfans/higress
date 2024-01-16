@@ -75,7 +75,7 @@ jobs:
       - name: Build Docker Image and Push
         run: |
           GOPROXY="https://proxy.golang.org,direct" make docker-buildx-push
-          BUILT_IMAGE="https://hub.docker.com/repository/docker/zjfans/higress_controller:1.1.1"
+          BUILT_IMAGE="zjfans/higress_controller:1.1.1"
           readarray -t IMAGES <<< "${{ steps.docker-meta.outputs.tags }}"
           for image in ${IMAGES[@]}; do
             echo "Image: $image"

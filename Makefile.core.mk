@@ -2,7 +2,7 @@ SHELL := /bin/bash -o pipefail
 
 export BASE_VERSION ?= 2022-10-27T19-02-22
 
-export HUB ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
+export HUB ?= https://hub.docker.com/repository/docker/zjfans/higress_controller
 
 export CHARTS ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/charts
 
